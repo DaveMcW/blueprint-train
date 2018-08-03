@@ -315,9 +315,6 @@ function revive_ghost(ghost)
     if not entity or not entity.valid then return false end
   end
 
-  entity.connect_rolling_stock(defines.rail_direction.front)
-  entity.connect_rolling_stock(defines.rail_direction.back)
-
   if entity.type == "cargo-wagon" and ghost.wagon_filters then
     local inventory = entity.get_inventory(defines.inventory.cargo_wagon)
     for i = 1, #inventory do
