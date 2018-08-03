@@ -711,7 +711,7 @@ function unserialize_signals(ghost, signals)
             i = i + 1
             condition.second_signal = signal.signal
             local constant = signal.count
-            if condition.second_signal.name == "blueprint-train-combinator-" .. entity_name then
+            if condition.second_signal.name == "blueprint-train-combinator-" .. ghost.name then
               -- It's a constant
               condition.constant = constant
               condition.second_signal = nil
