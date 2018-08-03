@@ -332,6 +332,10 @@ function revive_ghost(ghost)
       validate_schedule(ghost.schedule)
       entity.train.schedule = ghost.schedule
     end
+
+-- The item-request proxy collision bug prevents trains from connecting properly.
+-- Disable fuel requests until this is fixed.
+--[[
     if ghost.fuel and game.item_prototypes[ghost.fuel] then
       entity.surface.create_entity{
         name ="item-request-proxy",
@@ -341,6 +345,7 @@ function revive_ghost(ghost)
         modules = {[ghost.fuel] = game.item_prototypes[ghost.fuel].stack_size},
       }
     end
+]]
     if ghost.color then
       entity.color = ghost.color
     end
