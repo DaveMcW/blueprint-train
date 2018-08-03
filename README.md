@@ -1,7 +1,7 @@
 Adds support for trains in blueprints.
 
 ## Features
-Locomotive schedule, fuel, and color.
+Locomotive schedule and color.
 
 Cargo wagon filters.
 
