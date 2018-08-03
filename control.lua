@@ -749,6 +749,7 @@ function validate_schedule(schedule)
 end
 
 function signal_exists(signal)
+  if not signal then return end
   if not signal.name then return false end
   if not signal.type then return false end
   if signal.type == "item" then return game.item_prototypes[signal.name] end
