@@ -330,6 +330,14 @@ function revive_ghost(ghost)
       entity.train.schedule = ghost.schedule
     end
 
+    -- Add some starting energy to help align to a station
+    if ghost.auto and ghost.fuel and game.item_prototypes[ghost.fuel] then
+      entity.burner.currently_burning = game.item_prototypes[ghost.fuel]
+    else
+      entity.burner.currently_burning = game.item_prototypes["coal"]
+    end
+    entity.burner.remaining_burning_fuel = 100000
+
 -- The item-request proxy collision bug prevents trains from connecting properly.
 -- Disable fuel requests until this is fixed.
 --[[
