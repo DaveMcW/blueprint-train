@@ -562,8 +562,8 @@ function serialize_signals(entity)
                 -- Byte 3: wildcard signal, everything=1, anything=2
                 b3 = 0
                 if signal.type == "virtual" then
-                  if first_signal.name == "signal-everything" then b3 = 1 end
-                  if first_signal.name == "signal-anything" then b3 = 2 end
+                  if signal.name == "signal-everything" then b3 = 1 end
+                  if signal.name == "signal-anything" then b3 = 2 end
                 end
                 if b3 > 0 then
                   -- Can't write wildcard signal to constant combinator.
