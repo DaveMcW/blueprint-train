@@ -1,0 +1,9 @@
+{
+  "name":"blueprint-train",
+  "author":"DaveMcW",
+  "version":"0.16.1",
+  "title":"Blueprintable Trains",
+  "description":"Add trains to your blueprints",
+  "dependencies": ["base"],
+  "factorio_version": "0.16"
+}
