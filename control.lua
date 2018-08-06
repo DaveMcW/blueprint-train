@@ -330,15 +330,17 @@ function revive_ghost(ghost)
       entity.train.schedule = ghost.schedule
     end
 
-    -- Add some starting energy to help align to a station
-    if ghost.auto and ghost.fuel and game.item_prototypes[ghost.fuel] then
-      entity.burner.currently_burning = game.item_prototypes[ghost.fuel]
-    else
-      entity.burner.currently_burning = game.item_prototypes["coal"]
+    if ghost.auto then
+      -- Add some starting energy to help align to a station
+      if ghost.fuel and game.item_prototypes[ghost.fuel] then
+        entity.burner.currently_burning = game.item_prototypes[ghost.fuel]
+      else
+        entity.burner.currently_burning = game.item_prototypes["coal"]
+      end
     end
     entity.burner.remaining_burning_fuel = 100000
 
--- The item-request proxy collision bug prevents trains from connecting properly.
+-- The item-request-proxy collision bug prevents trains from connecting properly.
 -- Disable fuel requests until this is fixed.
 --[[
     if ghost.fuel and game.item_prototypes[ghost.fuel] then
@@ -677,10 +679,10 @@ function unserialize_signals(ghost, signals)
           signal = signals[i] or EMPTY_SIGNAL
           i = i + 1
           b1, b2, b3, b4 = unpack_signal(signal.count)
-          if name:len() < length then name = name .. string.char(b1) end
-          if name:len() < length then name = name .. string.char(b2) end
-          if name:len() < length then name = name .. string.char(b3) end
-          if name:len() < length then name = name .. string.char(b4) end
+          if name:len() < name_length then name = name .. string.char(b1) end
+          if name:len() < name_length then name = name .. string.char(b2) end
+          if name:len() < name_length then name = name .. string.char(b3) end
+          if name:len() < name_length then name = name .. string.char(b4) end
         end
 
         local record = { station = name, wait_conditions = {} }
