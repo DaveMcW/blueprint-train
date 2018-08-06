@@ -153,6 +153,7 @@ function get_train_layers(entity, direction)
 end
 
 function copy_layers(entity, layers, pictures, direction)
+    if not entity[pictures] then return end
     for _, source in pairs(entity[pictures].layers) do
       local layer = table.deepcopy(source)
       fix_graphics(entity, layer, pictures, direction)
@@ -164,6 +165,7 @@ function copy_layers(entity, layers, pictures, direction)
 end
 
 function copy_wheels(entity, layers, wheel_direction, direction)
+  if not entity.wheels then return end
   local j = entity.joint_distance/2 * wheel_direction
   local s45 = {x=0.64, y=0.67} -- Shift factor for 45 degree angle
   local wheel_shifts = {
