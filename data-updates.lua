@@ -61,7 +61,7 @@ function add_prototypes(entity)
   -- Try to find a matching item icon
   for _,i in pairs(data.raw.item) do
     if i.place_result == entity.name then
-      item.icon = i.icon
+      --item.icon = i.icon
       item.icon_size = i.icon_size
       break
     end
@@ -69,6 +69,10 @@ function add_prototypes(entity)
   if not item.icon then
     item.icon = combinator.icon
     item.icon_size = combinator.icon_size
+  end
+  if not item.icon then
+    item.icon = "__core__/graphics/empty.png"
+    item.icon_size = 1
   end
   data:extend{item}
 
