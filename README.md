@@ -18,4 +18,4 @@ Some intersections are impossible to build in because the trains snap to the wro
 
 Diagonal trains do not display properly in blueprint preview.
 
-Trains cannot travel through blueprints, and manually building on top of ghost trains does not work. ([fixed in Factorio 0.17](https://forums.factorio.com/viewtopic.php?f=7&t=61842))
+Trains cannot travel through ghost trains, and manually building on top of ghost trains does not work. ([fixed in Factorio 0.17](https://forums.factorio.com/viewtopic.php?f=7&t=61842))

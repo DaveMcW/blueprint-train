@@ -48,20 +48,29 @@ function add_prototypes(entity)
   end
   data:extend{combinator}
 
-  data:extend{
-    {
-      type = "item",
-      name = combinator.name,
-      localised_name = combinator.localised_name,
-      place_result = combinator.name,
-      subgroup = "transport",
-      order = "a[train-system]-z",
-      flags = {"hidden"},
-      stack_size = 1,
-      icon = combinator.icon,
-      icon_size = combinator.icon_size,
-    },
+  local item = {
+    type = "item",
+    name = combinator.name,
+    localised_name = combinator.localised_name,
+    place_result = combinator.name,
+    subgroup = "transport",
+    order = "a[train-system]-z",
+    flags = {"hidden"},
+    stack_size = 1,
   }
+  -- Try to find a matching item icon
+  for _,i in pairs(data.raw.item) do
+    if i.place_result == entity.name then
+      item.icon = i.icon
+      item.icon_size = i.icon_size
+      break
+    end
+  end
+  if not item.icon then
+    item.icon = combinator.icon
+    item.icon_size = combinator.icon_size
+  end
+  data:extend{item}
 
   local ghost_vertical = {
     type = "simple-entity-with-force",
