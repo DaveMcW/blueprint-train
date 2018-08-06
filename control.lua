@@ -225,6 +225,12 @@ function update_ghost(ghost_index)
   if ghost.chest.get_item_count(item_name) > 0
   and ghost.chest.remove_item{name = item_name, count = 1} > 0 then
     -- We have the train item
+
+    -- Destroy the request, so it can't collide with the revived train
+    if ghost.request and ghost.request.valid then
+      ghost.request.destroy()
+    end
+
     if not revive_ghost(ghost) then
       -- Refund the item
       ghost.chest.insert{name = item_name, count = 1}
