@@ -324,7 +324,7 @@ function revive_ghost(ghost)
   if entity.type == "cargo-wagon" and ghost.wagon_filters then
     local inventory = entity.get_inventory(defines.inventory.cargo_wagon)
     for i = 1, #inventory do
-      if ghost.wagon_filters[i] then
+      if ghost.wagon_filters[i] and game.item_prototypes[ghost.wagon_filters[i]] then
         inventory.set_filter(i, ghost.wagon_filters[i])
       end
     end
@@ -770,7 +770,7 @@ function validate_schedule(schedule)
 end
 
 function signal_exists(signal)
-  if not signal then return end
+  if not signal then return false end
   if not signal.name then return false end
   if not signal.type then return false end
   if signal.type == "item" then return game.item_prototypes[signal.name] end
@@ -781,43 +781,6 @@ end
 
 function get_direction(orientation)
   return math.floor(orientation * 4 + 0.5) * 2 % 8
-end
-
-function string_to_signals(str)
-  local array = {}
-  local length = str:len()
-  for i = 0, length/4 do
-    local b1, b2, b3, b4 = 0, 0, 0, 0
-    if i == 0 then
-      -- First byte encodes the length of the string
-      b1 = math.min(length, 255)
-    else
-      b1 = str:byte(i*4)
-    end
-    if i*4+1 <= length then b2 = str:byte(i*4+1) end
-    if i*4+2 <= length then b3 = str:byte(i*4+2) end
-    if i*4+3 <= length then b4 = str:byte(i*4+3) end
-    table.insert(array, pack_signal(b1, b2, b3, b4))
-  end
-  return array
-end
-
-function signals_to_string(array)
-  local length = 0
-  local str = ""
-  for k, v in pairs(array) do
-    local b1, b2, b3, b4 = unpack_signal(v)
-    if k == 1 then
-      -- First byte encodes the length of the string
-      length = b1
-    else
-      if str:len() < length then str = str .. string.char(b1) end
-    end
-    if str:len() < length then str = str .. string.char(b2) end
-    if str:len() < length then str = str .. string.char(b3) end
-    if str:len() < length then str = str .. string.char(b4) end
-  end
-  return str
 end
 
 function pack_signal(b1, b2, b3, b4)
