@@ -165,7 +165,7 @@ function copy_wheels(entity, layers, wheel_direction, direction)
   }
   local shift = wheel_shifts[direction]
   shift[2] = shift[2] + TRAIN_WHEEL_VERTICAL_SHIFT
-  if wheel_direction == -1 then direction = direction + 4 end
+  if wheel_direction == -1 then direction = (direction + 4) % 8 end
   local layer = table.deepcopy(entity.wheels)
   layer.shift = shift
   fix_graphics(entity, layer, pictures, direction)
