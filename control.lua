@@ -66,6 +66,19 @@ function on_player_setup_blueprint(event)
     area = area,
     force = player.force,
   }
+
+  local found_train = false
+  for _,entity in pairs(entities) do
+    if entity.type == "locomotive"
+    or entity.type == "cargo-wagon"
+    or entity.type == "fluid-wagon"
+    or entity.type == "artillery-wagon" then
+      found_train = true
+      break
+    end
+  end
+  if not found_train then return end
+
   local data = serialize_data(entities)
   if player.cursor_stack
   and player.cursor_stack.valid_for_read
@@ -343,8 +356,8 @@ function revive_ghost(ghost)
       else
         entity.burner.currently_burning = game.item_prototypes["coal"]
       end
+      entity.burner.remaining_burning_fuel = 100000
     end
-    entity.burner.remaining_burning_fuel = 100000
 
 -- The item-request-proxy collision bug prevents trains from connecting properly.
 -- Disable fuel requests until this is fixed.
