@@ -61,7 +61,7 @@ function add_prototypes(entity)
   -- Try to find a matching item icon
   for _,i in pairs(data.raw.item) do
     if i.place_result == entity.name then
-      --item.icon = i.icon
+      item.icon = i.icon
       item.icon_size = i.icon_size
       break
     end
