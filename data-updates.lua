@@ -2,6 +2,30 @@ local TRAIN_WHEEL_VERTICAL_SHIFT = -0.25 -- Magic wheel shift constant
 local GHOST_TINT = {r=0.6, g=0.6, b=0.6, a=0.3}
 
 function add_prototypes(entity)
+  local item = {
+    type = "item",
+    name = "blueprint-train-combinator-" .. entity.name,
+    localised_name = {"entity-name." .. entity.name},
+    place_result = "blueprint-train-combinator-" .. entity.name,
+    subgroup = "transport",
+    order = "a[train-system]-z",
+    flags = {"hidden"},
+    stack_size = 1,
+  }
+  -- Find the original item used to build the entity
+  for _,i in pairs(data.raw["item-with-entity-data"]) do
+    if i.place_result == entity.name then
+      item.icon = i.icon
+      item.icon_size = i.icon_size
+      break
+    end
+  end
+  if not item.icon then
+    -- The entity is not buildable, abort!
+    return
+  end
+  data:extend{item}
+
   local combinator = table.deepcopy(data.raw["constant-combinator"]["constant-combinator"]);
   combinator.name = "blueprint-train-combinator-" .. entity.name
   combinator.localised_name = {"entity-name." .. entity.name}
@@ -47,34 +71,6 @@ function add_prototypes(entity)
     })
   end
   data:extend{combinator}
-
-  local item = {
-    type = "item",
-    name = combinator.name,
-    localised_name = combinator.localised_name,
-    place_result = combinator.name,
-    subgroup = "transport",
-    order = "a[train-system]-z",
-    flags = {"hidden"},
-    stack_size = 1,
-  }
-  -- Try to find a matching item icon
-  for _,i in pairs(data.raw.item) do
-    if i.place_result == entity.name then
-      item.icon = i.icon
-      item.icon_size = i.icon_size
-      break
-    end
-  end
-  if not item.icon then
-    item.icon = combinator.icon
-    item.icon_size = combinator.icon_size
-  end
-  if not item.icon then
-    item.icon = "__core__/graphics/empty.png"
-    item.icon_size = 1
-  end
-  data:extend{item}
 
   local ghost_vertical = {
     type = "simple-entity-with-force",
@@ -195,6 +191,9 @@ function copy_wheels(entity, layers, wheel_direction, direction)
 end
 
 function fix_graphics(entity, layer, pictures, direction)
+  if layer.apply_runtime_tint then
+    layer.tint = entity.color
+  end
   local count = layer.direction_count
   if layer.back_equals_front then
     count = count * 2
@@ -205,9 +204,6 @@ function fix_graphics(entity, layer, pictures, direction)
   local slot = orientation - file * layer.line_length * layer.lines_per_file
   layer.x = layer.width * (slot % layer.line_length)
   layer.y = layer.height * math.floor(slot / layer.line_length)
-  if layer.apply_runtime_tint then
-    layer.tint = entity.color
-  end
   if pictures == "cannon_barrel_pictures" or pictures == "cannon_base_pictures" then
     local cannon_shift = entity.cannon_base_shiftings[orientation + 1]
     if not layer.shift then layer.shift = {0,0} end
