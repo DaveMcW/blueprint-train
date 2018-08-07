@@ -4,7 +4,7 @@
   "version":"0.16.8",
   "title":"Blueprintable Trains",
   "description":"Add trains to your blueprints",
-  "homepage": "https://forums.factorio.com/viewtopic.php?f=190&t=61970",
+  "homepage": "https://forums.factorio.com/viewtopic.php?t=61970",
   "dependencies": ["base"],
   "factorio_version": "0.16"
 }
