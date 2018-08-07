@@ -1,7 +1,7 @@
 {
   "name":"blueprint-train",
   "author":"DaveMcW",
-  "version":"0.16.7",
+  "version":"0.16.8",
   "title":"Blueprintable Trains",
   "description":"Add trains to your blueprints",
   "dependencies": ["base"],

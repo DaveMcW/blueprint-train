@@ -95,6 +95,7 @@ function add_prototypes(entity)
     local layers = get_train_layers(entity, defines.direction[direction])
     for _, layer in pairs(layers) do
       layer.tint = GHOST_TINT
+      if layer.hr_version then layer.hr_version.tint = GHOST_TINT end
     end
     table.insert(ghost_vertical.pictures, {layers=layers})
   end
@@ -116,6 +117,7 @@ function add_prototypes(entity)
     local layers = get_train_layers(entity, defines.direction[direction])
     for _, layer in pairs(layers) do
       layer.tint = GHOST_TINT
+      if layer.hr_version then layer.hr_version.tint = GHOST_TINT end
     end
     table.insert(ghost_horizontal.pictures, {layers=layers})
   end
@@ -134,6 +136,7 @@ function add_prototypes(entity)
     local layers = get_train_layers(entity, defines.direction[direction])
     for _, layer in pairs(layers) do
       layer.tint = GHOST_TINT
+      if layer.hr_version then layer.hr_version.tint = GHOST_TINT end
     end
     table.insert(ghost_diagonal.pictures, {layers=layers})
   end
@@ -202,7 +205,9 @@ function fix_graphics(entity, layer, pictures, direction)
   local slot = orientation - file * layer.line_length * layer.lines_per_file
   layer.x = layer.width * (slot % layer.line_length)
   layer.y = layer.height * math.floor(slot / layer.line_length)
-
+  if layer.apply_runtime_tint then
+    layer.tint = entity.color
+  end
   if pictures == "cannon_barrel_pictures" or pictures == "cannon_base_pictures" then
     local cannon_shift = entity.cannon_base_shiftings[orientation + 1]
     if not layer.shift then layer.shift = {0,0} end
