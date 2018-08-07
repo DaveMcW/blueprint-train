@@ -2,8 +2,17 @@
 Version: 0.16.8
 Date: 07. 08. 2018
   Features:
-    - Locomotives request a stack of fuel when the train is complete
+    - Locomotives request a stack of fuel when the train is complete.
+    - Shift + click to create ghost trains.
   Changes:
-    - Automatic mode is not enabled until every locomotive has fuel
+    - Automatic mode is not enabled until every locomotive has fuel.
   Bugfixes:
-    - High-res ghosts are now transparent
+    - High-res ghosts are now transparent.
+---------------------------------------------------------------------------------------------------
+Version: 0.16.7
+Date: 06. 08. 2018
+  Features:
+    - Locomotive schedule and color.
+    - Cargo wagon filters.
+    - Automatic mode.
+    - Press the mod button to stop adding trains to new blueprints. Existing blueprints with trains still work.

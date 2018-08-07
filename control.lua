@@ -80,8 +80,7 @@ function on_player_setup_blueprint(event)
   if not found_train then return end
 
   local data = serialize_data(entities)
-  if player.cursor_stack
-  and player.cursor_stack.valid_for_read
+  if player.cursor_stack.valid_for_read
   and player.cursor_stack.name == "blueprint" then
     add_to_blueprint(data, player.cursor_stack)
   else
@@ -94,8 +93,7 @@ end
 function on_player_configured_blueprint(event)
   -- Finally, we can access the blueprint!
   local player = game.players[event.player_index]
-  if player.cursor_stack
-  and player.cursor_stack.valid_for_read
+  if player.cursor_stack.valid_for_read
   and player.cursor_stack.name == "blueprint"
   and global.new_data[event.player_index] then
     add_to_blueprint(global.new_data[event.player_index], player.cursor_stack)
@@ -154,6 +152,28 @@ function on_marked_for_deconstruction(event)
   end
 end
 
+function on_put_item(event)
+  -- Shift + click to create ghosts
+  if not event.shift_build then return end
+  local player = game.players[event.player_index]
+  if not player.cursor_stack.valid_for_read then return end
+  local entity = game.entity_prototypes[player.cursor_stack.name]
+  if not entity then return end
+  if entity.type == "locomotive"
+  or entity.type == "cargo-wagon"
+  or entity.type == "fluid-wagon"
+  or entity.type == "artillery-wagon" then
+    local data = {
+      name = "blueprint-train-combinator-" .. entity.name,
+      position = event.position,
+      direction = event.direction,
+      force = player.force,
+    }
+    if not player.surface.can_place_entity(data) then return end
+    on_built_entity{created_entity = player.surface.create_entity(data)}
+  end
+end
+
 function on_built_entity(event)
   local combinator = event.created_entity
   if combinator
@@ -165,114 +185,6 @@ function on_built_entity(event)
   ) then
     build_ghost(combinator)
   end
-end
-
-function on_tick()
-  -- Only update 1 ghost per tick, to keep update times low
-  if #global.ghosts < 1 then return end
-  if global.current_ghost > #global.ghosts then global.current_ghost = 1 end
-  local increment = update_ghost(global.current_ghost)
-  global.current_ghost = global.current_ghost + increment
-end
-
-function update_ghost(ghost_index)
-  -- Update the 3 entities used in the fake ghost:
-  -- simple-entity, container, and item-request-proxy.
-  -- Returns the number to add to increment the current ghost.
-
-  local ghost = global.ghosts[ghost_index]
-  if not ghost then return destroy_ghost(ghost_index) end
-
-  if ghost.revived then
-    -- Request fuel
-    -- Request equipment
-  else
-    if not ghost.entity or not ghost.entity.valid then
-      -- The entity has been destroyed, destroy the ghost too
-      return destroy_ghost(ghost_index)
-    end
-
-    local area = {
-      {ghost.entity.position.x - 5, ghost.entity.position.y - 5},
-      {ghost.entity.position.x + 5, ghost.entity.position.y + 5},
-    }
-    local ghost_rails = ghost.entity.surface.count_entities_filtered{
-      ghost_type = {"straight-rail", "curved_rail"},
-      area = area,
-      force = ghost.entity.force,
-    }
-    if ghost_rails > 0 then
-      -- Wait for rails to be built
-      return 1
-    end
-
-    local rails = ghost.entity.surface.count_entities_filtered{
-      type = {"straight-rail", "curved_rail"},
-      area = area,
-      force = ghost.entity.force,
-    }
-    if rails < 1 then
-      -- The rails have been destroyed, destroy the ghost too
-      return destroy_ghost(ghost_index)
-    end
-
-    local item_name = ghost.entity.name:sub(26)
-    if not ghost.created_proxy then
-      -- We have some rails, now request a train item
-      ghost.chest = ghost.entity.surface.create_entity{
-        name = "blueprint-train-chest",
-        position = ghost.entity.position,
-        force = ghost.entity.force,
-      }
-      ghost.chest.destructible = false
-      ghost.request = ghost.entity.surface.create_entity{
-        name = "blueprint-train-item-request",
-        position = ghost.entity.position,
-        force = ghost.entity.force,
-        target = ghost.chest,
-        modules = {[item_name] = 1},
-      }
-      ghost.created_proxy = true
-      return 1
-    end
-
-    if not ghost.chest
-    or not ghost.chest.valid then
-      -- The chest has been destroyed, destroy the ghost too
-      return destroy_ghost(ghost_index)
-    end
-
-    if ghost.chest.get_item_count(item_name) > 0
-    and ghost.chest.remove_item{name = item_name, count = 1} > 0 then
-      -- We have the train item
-
-      -- Destroy the request, so it can't collide with the revived train
-      if ghost.request and ghost.request.valid then
-        ghost.request.destroy()
-      end
-
-      if revive_ghost(ghost) then
-        ghost.revived = true
-
-        -- Request fuel
-        -- Request equipment
-
-        return 1
-      else
-        -- Refund the item
-        ghost.chest.insert{name = item_name, count = 1}
-        return destroy_ghost(ghost_index)
-      end
-    end
-
-    if not ghost.request
-    or not ghost.request.valid then
-      -- The request has been destroyed, destroy the ghost too
-      return destroy_ghost(ghost_index)
-    end
-  end
-
-  return 1
 end
 
 function build_ghost(combinator)
@@ -330,7 +242,145 @@ function build_ghost(combinator)
   combinator.destroy()
 end
 
+function on_tick()
+  -- Only update 1 ghost per tick, to keep update times low
+  if #global.ghosts < 1 then return end
+  if global.current_ghost > #global.ghosts then global.current_ghost = 1 end
+  local increment = update_ghost(global.current_ghost)
+  global.current_ghost = global.current_ghost + increment
+end
+
+function update_ghost(ghost_index)
+  -- Update the 3 entities used in the fake ghost:
+  -- simple-entity, container, and item-request-proxy.
+  -- Returns the number to add to increment the current ghost.
+
+  local ghost = global.ghosts[ghost_index]
+  if not ghost or not ghost.entity or not ghost.entity.valid then
+    return destroy_ghost(ghost_index)
+  end
+
+  if ghost.requested_items then
+    if ghost.fuel and not game.item_prototypes[ghost.fuel] then
+      -- Our fuel mod was removed
+      ghost.fuel = nil
+      if ghost.request and ghost.request.valid then
+        ghost.request.destroy()
+        ghost.request = nil
+      end
+    end
+    if ghost.fuel then
+      local inventory = ghost.entity.get_inventory(defines.inventory.fuel)
+      if inventory.get_item_count(ghost.fuel) >= game.item_prototypes[ghost.fuel].stack_size then
+        -- Fuel is full
+        if ghost.request and ghost.request.valid then
+          ghost.request.destroy()
+          ghost.request = nil
+        end
+      end
+    end
+    if not ghost.request or not ghost.request.valid then
+      -- Everything is finished
+      set_auto_mode(ghost.entity.train, ghost.auto)
+      ghost.entity = nil
+      return destroy_ghost(ghost_index)
+    end
+  end
+
+  if not ghost.revived then
+    local area = {
+      {ghost.entity.position.x - 5, ghost.entity.position.y - 5},
+      {ghost.entity.position.x + 5, ghost.entity.position.y + 5},
+    }
+    local ghost_rails = ghost.entity.surface.count_entities_filtered{
+      ghost_type = {"straight-rail", "curved_rail"},
+      area = area,
+      force = ghost.entity.force,
+    }
+    if ghost_rails > 0 then
+      -- Wait for rails to be built
+      return 1
+    end
+
+    local rails = ghost.entity.surface.count_entities_filtered{
+      type = {"straight-rail", "curved_rail"},
+      area = area,
+      force = ghost.entity.force,
+    }
+    if rails < 1 then
+      -- The rails have been destroyed, destroy the ghost too
+      return destroy_ghost(ghost_index)
+    end
+
+    local item_name = ghost.entity.name:sub(26)
+    if not ghost.created_proxy then
+      -- We have some rails, now request a train item
+      ghost.chest = ghost.entity.surface.create_entity{
+        name = "blueprint-train-chest",
+        position = ghost.entity.position,
+        force = ghost.entity.force,
+      }
+      ghost.chest.destructible = false
+      ghost.request = ghost.entity.surface.create_entity{
+        name = "blueprint-train-item-request",
+        position = ghost.entity.position,
+        force = ghost.entity.force,
+        target = ghost.chest,
+        modules = {[item_name] = 1},
+      }
+      ghost.created_proxy = true
+      return 1
+    end
+
+    if not ghost.chest
+    or not ghost.chest.valid then
+      -- The chest has been destroyed, destroy the ghost too
+      return destroy_ghost(ghost_index)
+    end
+
+    if ghost.chest.get_item_count(item_name) > 0
+    and ghost.chest.remove_item{name = item_name, count = 1} > 0 then
+      -- We have the train item
+
+      if revive_ghost(ghost) then
+        local carriages = ghost.entity.train.carriages
+        if ghost.length == #carriages then
+          -- The train is complete, now it is safe to make item requests
+          for c = 1, #carriages do
+            for i = 1, #global.ghosts do
+              if global.ghosts[i].entity
+              and global.ghosts[i].entity.valid
+              and global.ghosts[i].entity == carriages[c] then
+                request_items(global.ghosts[i])
+                break
+              end
+            end
+          end
+        end
+        return 1
+      else
+        -- Refund the item
+        ghost.chest.insert{name = item_name, count = 1}
+        return destroy_ghost(ghost_index)
+      end
+    end
+
+    if not ghost.request
+    or not ghost.request.valid then
+      -- The request has been destroyed, destroy the ghost too
+      return destroy_ghost(ghost_index)
+    end
+  end
+
+  return 1
+end
+
 function revive_ghost(ghost)
+  -- Destroy the request, so it can't collide with the revived train
+  if ghost.request and ghost.request.valid then
+    ghost.request.destroy()
+  end
+
   local data = {
     name = ghost.entity.name:sub(26),
     position = ghost.entity.position,
@@ -364,40 +414,16 @@ function revive_ghost(ghost)
       entity.train.schedule = ghost.schedule
     end
 
-    if ghost.auto then
-      -- Add some starting energy to help align to a station
-      if ghost.fuel and game.item_prototypes[ghost.fuel] then
-        entity.burner.currently_burning = game.item_prototypes[ghost.fuel]
-      else
-        entity.burner.currently_burning = game.item_prototypes["coal"]
-      end
-      entity.burner.remaining_burning_fuel = 100000
-    end
-
--- The item-request-proxy collision bug prevents trains from connecting properly.
--- Disable fuel requests until this is fixed.
---[[
-    if ghost.fuel and game.item_prototypes[ghost.fuel] then
-      entity.surface.create_entity{
-        name ="item-request-proxy",
-        position = entity.position,
-        force = entity.force,
-        target = entity,
-        modules = {[ghost.fuel] = game.item_prototypes[ghost.fuel].stack_size},
-      }
-    end
-]]
     if ghost.color then
       entity.color = ghost.color
     end
   end
 
-  if ghost.length == #entity.train.carriages then
-    -- Request fuel
-    if ghost.auto then
-      entity.train.manual_mode = false
-    end
+  if ghost.entity and ghost.entity.valid then
+    ghost.entity.destroy()
   end
+  ghost.entity = entity
+  ghost.revived = true
 
   return true
 end
@@ -428,6 +454,42 @@ function destroy_ghost(ghost_index)
   table.remove(global.ghosts, ghost_index)
   -- We shrunk the ghost table instead of incrementing the current ghost
   return 0
+end
+
+function request_items(ghost)
+  if ghost.fuel and not game.item_prototypes[ghost.fuel] then
+    ghost.fuel = nil
+  end
+  if ghost.fuel then
+    ghost.request = ghost.entity.surface.create_entity{
+      name ="item-request-proxy",
+      position = ghost.entity.position,
+      force = ghost.entity.force,
+      target = ghost.entity,
+      modules = {[ghost.fuel] = game.item_prototypes[ghost.fuel].stack_size}
+    }
+  end
+  ghost.requested_items = true
+end
+
+function set_auto_mode(train, auto)
+  local finished = true
+  for c = 1, #train.carriages do
+    for i = 1, #global.ghosts do
+      local ghost = global.ghosts[i]
+      if ghost.entity
+      and ghost.entity.valid
+      and ghost.entity == train.carriages[c]
+      and ghost.request
+      and ghost.request.valid then
+        -- Wait for all requests to be filled
+        finished = false
+      end
+    end
+  end
+  if finished then
+    train.manual_mode = not auto
+  end
 end
 
 function calculate_offset(table1, table2, offset)
@@ -683,7 +745,7 @@ function unserialize_signals(ghost, signals)
     -- Read color
     signal = signals[i] or EMPTY_SIGNAL
     i = i + 1
-    if signal.count ~= 0 then
+    if signal.count ~= 0 and signal.count ~= 1 then
       b1, b2, b3, b4 = unpack_signal(signal.count)
       ghost.color = {
         r = b1 / 255,
@@ -847,6 +909,7 @@ script.on_init(on_init)
 script.on_event(defines.events.on_player_created, on_player_created)
 script.on_event(defines.events.on_gui_opened, on_gui_opened)
 script.on_event(defines.events.on_gui_click, on_gui_click)
+script.on_event(defines.events.on_put_item, on_put_item)
 script.on_event(defines.events.on_built_entity, on_built_entity)
 script.on_event(defines.events.on_robot_built_entity, on_built_entity)
 script.on_event(defines.events.on_marked_for_deconstruction, on_marked_for_deconstruction)
