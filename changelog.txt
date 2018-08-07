@@ -3,7 +3,7 @@ Version: 0.16.8
 Date: 07. 08. 2018
   Features:
     - Locomotives request a stack of fuel when the train is complete.
-    - Shift + click to create ghost trains.
+    - Shift-click to create ghost trains.
   Changes:
     - Automatic mode is not enabled until every locomotive has fuel.
   Bugfixes:

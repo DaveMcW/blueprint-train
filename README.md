@@ -7,7 +7,7 @@ Cargo wagon filters.
 
 Automatic mode.
 
-Shift + click to create ghost trains.
+Shift-click to create ghost trains.
 
 Press the mod button to stop adding trains to new blueprints. Existing blueprints with trains still work.
 
@@ -20,6 +20,6 @@ Some intersections are impossible to build in because the trains snap to the wro
 
 Diagonal trains do not display properly in blueprint preview.
 
-Shift + click uses 4 directions, the train preview uses 2 directions, and they don't merge correctly.
+Shift-click uses 4 directions, the train preview uses 2 directions, and they don't merge correctly.
 
 Trains cannot travel through ghost trains, and manually building on top of ghost trains does not work. ([fixed in Factorio 0.17](https://forums.factorio.com/viewtopic.php?f=7&t=61842))
