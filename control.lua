@@ -181,81 +181,95 @@ function update_ghost(ghost_index)
   -- Returns the number to add to increment the current ghost.
 
   local ghost = global.ghosts[ghost_index]
-  if not ghost or not ghost.entity or not ghost.entity.valid then
-    -- The entity has been destroyed, destroy the ghost too
-    return destroy_ghost(ghost_index)
-  end
+  if not ghost then return destroy_ghost(ghost_index) end
 
-  local area = {
-    {ghost.entity.position.x - 5, ghost.entity.position.y - 5},
-    {ghost.entity.position.x + 5, ghost.entity.position.y + 5},
-  }
-  local ghost_rails = ghost.entity.surface.count_entities_filtered{
-    ghost_type = {"straight-rail", "curved_rail"},
-    area = area,
-    force = ghost.entity.force,
-  }
-  if ghost_rails > 0 then
-    -- Wait for rails to be built
-    return 1
-  end
-
-  local rails = ghost.entity.surface.count_entities_filtered{
-    type = {"straight-rail", "curved_rail"},
-    area = area,
-    force = ghost.entity.force,
-  }
-  if rails < 1 then
-    -- The rails have been destroyed, destroy the ghost too
-    return destroy_ghost(ghost_index)
-  end
-
-  local item_name = ghost.entity.name:sub(26)
-  if not ghost.created_proxy then
-    -- We have some rails, now request a train item
-    ghost.chest = ghost.entity.surface.create_entity{
-      name = "blueprint-train-chest",
-      position = ghost.entity.position,
-      force = ghost.entity.force,
-    }
-    ghost.chest.destructible = false
-    ghost.request = ghost.entity.surface.create_entity{
-      name = "blueprint-train-item-request",
-      position = ghost.entity.position,
-      force = ghost.entity.force,
-      target = ghost.chest,
-      modules = {[item_name] = 1},
-    }
-    ghost.created_proxy = true
-    return 1
-  end
-
-  if not ghost.chest
-  or not ghost.chest.valid then
-    -- The chest has been destroyed, destroy the ghost too
-    return destroy_ghost(ghost_index)
-  end
-
-  if ghost.chest.get_item_count(item_name) > 0
-  and ghost.chest.remove_item{name = item_name, count = 1} > 0 then
-    -- We have the train item
-
-    -- Destroy the request, so it can't collide with the revived train
-    if ghost.request and ghost.request.valid then
-      ghost.request.destroy()
+  if ghost.revived then
+    -- Request fuel
+    -- Request equipment
+  else
+    if not ghost.entity or not ghost.entity.valid then
+      -- The entity has been destroyed, destroy the ghost too
+      return destroy_ghost(ghost_index)
     end
 
-    if not revive_ghost(ghost) then
-      -- Refund the item
-      ghost.chest.insert{name = item_name, count = 1}
+    local area = {
+      {ghost.entity.position.x - 5, ghost.entity.position.y - 5},
+      {ghost.entity.position.x + 5, ghost.entity.position.y + 5},
+    }
+    local ghost_rails = ghost.entity.surface.count_entities_filtered{
+      ghost_type = {"straight-rail", "curved_rail"},
+      area = area,
+      force = ghost.entity.force,
+    }
+    if ghost_rails > 0 then
+      -- Wait for rails to be built
+      return 1
     end
-    return destroy_ghost(ghost_index)
-  end
 
-  if not ghost.request
-  or not ghost.request.valid then
-    -- The request has been destroyed, destroy the ghost too
-    return destroy_ghost(ghost_index)
+    local rails = ghost.entity.surface.count_entities_filtered{
+      type = {"straight-rail", "curved_rail"},
+      area = area,
+      force = ghost.entity.force,
+    }
+    if rails < 1 then
+      -- The rails have been destroyed, destroy the ghost too
+      return destroy_ghost(ghost_index)
+    end
+
+    local item_name = ghost.entity.name:sub(26)
+    if not ghost.created_proxy then
+      -- We have some rails, now request a train item
+      ghost.chest = ghost.entity.surface.create_entity{
+        name = "blueprint-train-chest",
+        position = ghost.entity.position,
+        force = ghost.entity.force,
+      }
+      ghost.chest.destructible = false
+      ghost.request = ghost.entity.surface.create_entity{
+        name = "blueprint-train-item-request",
+        position = ghost.entity.position,
+        force = ghost.entity.force,
+        target = ghost.chest,
+        modules = {[item_name] = 1},
+      }
+      ghost.created_proxy = true
+      return 1
+    end
+
+    if not ghost.chest
+    or not ghost.chest.valid then
+      -- The chest has been destroyed, destroy the ghost too
+      return destroy_ghost(ghost_index)
+    end
+
+    if ghost.chest.get_item_count(item_name) > 0
+    and ghost.chest.remove_item{name = item_name, count = 1} > 0 then
+      -- We have the train item
+
+      -- Destroy the request, so it can't collide with the revived train
+      if ghost.request and ghost.request.valid then
+        ghost.request.destroy()
+      end
+
+      if revive_ghost(ghost) then
+        ghost.revived = true
+
+        -- Request fuel
+        -- Request equipment
+
+        return 1
+      else
+        -- Refund the item
+        ghost.chest.insert{name = item_name, count = 1}
+        return destroy_ghost(ghost_index)
+      end
+    end
+
+    if not ghost.request
+    or not ghost.request.valid then
+      -- The request has been destroyed, destroy the ghost too
+      return destroy_ghost(ghost_index)
+    end
   end
 
   return 1
@@ -378,8 +392,11 @@ function revive_ghost(ghost)
     end
   end
 
-  if ghost.auto and ghost.length == #entity.train.carriages then
-    entity.train.manual_mode = false
+  if ghost.length == #entity.train.carriages then
+    -- Request fuel
+    if ghost.auto then
+      entity.train.manual_mode = false
+    end
   end
 
   return true
