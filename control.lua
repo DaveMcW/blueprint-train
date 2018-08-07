@@ -218,6 +218,7 @@ function update_ghost(ghost_index)
       position = ghost.entity.position,
       force = ghost.entity.force,
     }
+    chest.destructible = false
     ghost.request = ghost.entity.surface.create_entity{
       name = "blueprint-train-item-request",
       position = ghost.entity.position,
