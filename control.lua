@@ -939,7 +939,9 @@ function unpack_bytes(n, count)
 end
 
 function on_configuration_changed(data)
-  local old_version = data.mod_changes["blueprint-train"].old_version
+  local changes = data.mod_changes["blueprint-train"]
+  if not changes then return end
+  local old_version = changes.old_version
 
   -- Version 0.16.9 adds new train_id format
   if old_version and tonumber(old_version:sub(6)) < 9 then
