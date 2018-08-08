@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.16.9
+Date: 08. 08. 2018
+  Changes:
+    - Changed internal train_id system. Blueprints containing more than 1 train should be remade.
+---------------------------------------------------------------------------------------------------
 Version: 0.16.8
 Date: 07. 08. 2018
   Features:

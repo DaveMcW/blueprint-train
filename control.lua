@@ -1,14 +1,16 @@
 require("mod-gui")
 
-local WAIT_CONDITIONS = { "time", "inactivity", "full", "empty", "item_count", "circuit", "robots_inactive", "fluid_count" }
+local WAIT_CONDITIONS = {"time", "inactivity", "full", "empty", "item_count", "circuit", "robots_inactive", "fluid_count"}
 local COMPARATORS = {"<", ">", "=", "≥", "≤", "≠"}
-local EMPTY_SIGNAL = {count = 0, signal = {name="signal-1", type="virtual"} }
+local EMPTY_SIGNAL = {count = 0, signal = {name="signal-1", type="virtual"}}
 
 function on_init()
   global.disabled = {}
   global.new_data = {}
   global.ghosts = {}
   global.current_ghost = 1
+  global.train_id_cache = {}
+  global.last_train_id = 0
   for _, player in pairs (game.players) do
     init_gui(player)
   end
@@ -153,7 +155,7 @@ function on_marked_for_deconstruction(event)
 end
 
 function on_put_item(event)
-  -- Shift + click to create ghosts
+  -- Shift-click to create ghosts
   if not event.shift_build then return end
   local player = game.players[event.player_index]
   if not player.cursor_stack.valid_for_read then return end
@@ -170,7 +172,14 @@ function on_put_item(event)
       force = player.force,
     }
     if not player.surface.can_place_entity(data) then return end
-    on_built_entity{created_entity = player.surface.create_entity(data)}
+    entity = player.surface.create_entity(data)
+    if not entity then return end
+    -- Write orientation
+    entity.get_or_create_control_behavior().set_signal(1, {
+      signal = {name="signal-1", type="virtual"},
+      count = pack_signal(event.direction * 32, 0, 0, 0),
+    })
+    on_built_entity{created_entity = entity}
   end
 end
 
@@ -183,11 +192,11 @@ function on_built_entity(event)
     combinator.type == "entity-ghost" and combinator.ghost_name:sub(1, 27) == "blueprint-train-combinator-"
     or combinator.type == "constant-combinator" and combinator.name:sub(1, 27) == "blueprint-train-combinator-"
   ) then
-    build_ghost(combinator)
+    build_ghost(combinator, event.stack)
   end
 end
 
-function build_ghost(combinator)
+function build_ghost(combinator, blueprint)
   local entity_name = combinator.name:sub(28)
   if combinator.type == "entity-ghost" then
     entity_name = combinator.ghost_name:sub(28)
@@ -199,7 +208,7 @@ function build_ghost(combinator)
     direction = combinator.direction,
     auto = behavior.enabled
   }
-  unserialize_signals(ghost, behavior.parameters.parameters)
+  unserialize_signals(ghost, behavior.parameters.parameters, blueprint)
 
   -- Pick from 3 different simple-entity so the selection box has the correct shape
   local orientation = ghost.orientation
@@ -248,6 +257,9 @@ function on_tick()
   if global.current_ghost > #global.ghosts then global.current_ghost = 1 end
   local increment = update_ghost(global.current_ghost)
   global.current_ghost = global.current_ghost + increment
+
+  -- Reset train id cache
+  global.train_id_cache = {}
 end
 
 function update_ghost(ghost_index)
@@ -258,33 +270,6 @@ function update_ghost(ghost_index)
   local ghost = global.ghosts[ghost_index]
   if not ghost or not ghost.entity or not ghost.entity.valid then
     return destroy_ghost(ghost_index)
-  end
-
-  if ghost.requested_items then
-    if ghost.fuel and not game.item_prototypes[ghost.fuel] then
-      -- Our fuel mod was removed
-      ghost.fuel = nil
-      if ghost.request and ghost.request.valid then
-        ghost.request.destroy()
-        ghost.request = nil
-      end
-    end
-    if ghost.fuel then
-      local inventory = ghost.entity.get_inventory(defines.inventory.fuel)
-      if inventory.get_item_count(ghost.fuel) >= game.item_prototypes[ghost.fuel].stack_size then
-        -- Fuel is full
-        if ghost.request and ghost.request.valid then
-          ghost.request.destroy()
-          ghost.request = nil
-        end
-      end
-    end
-    if not ghost.request or not ghost.request.valid then
-      -- Everything is finished
-      set_auto_mode(ghost.entity.train, ghost.auto)
-      ghost.entity = nil
-      return destroy_ghost(ghost_index)
-    end
   end
 
   if not ghost.revived then
@@ -343,20 +328,24 @@ function update_ghost(ghost_index)
       -- We have the train item
 
       if revive_ghost(ghost) then
-        local carriages = ghost.entity.train.carriages
-        if ghost.length == #carriages then
+        -- Count the remaining ghosts in this train
+        local train_complete = true
+        for i = 1, #global.ghosts do
+          if global.ghosts[i].train_id == ghost.train_id
+          and not global.ghosts[i].revived then
+            train_complete = false
+            break
+          end
+        end
+        if train_complete then
           -- The train is complete, now it is safe to make item requests
-          for c = 1, #carriages do
-            for i = 1, #global.ghosts do
-              if global.ghosts[i].entity
-              and global.ghosts[i].entity.valid
-              and global.ghosts[i].entity == carriages[c] then
-                request_items(global.ghosts[i])
-                break
-              end
+          for i = 1, #global.ghosts do
+            if global.ghosts[i].train_id == ghost.train_id then
+              request_items(global.ghosts[i])
             end
           end
         end
+
         return 1
       else
         -- Refund the item
@@ -368,6 +357,33 @@ function update_ghost(ghost_index)
     if not ghost.request
     or not ghost.request.valid then
       -- The request has been destroyed, destroy the ghost too
+      return destroy_ghost(ghost_index)
+    end
+  end
+
+  if ghost.requested_items then
+    if ghost.fuel and not game.item_prototypes[ghost.fuel] then
+      -- A fuel mod was removed
+      ghost.fuel = nil
+      if ghost.request and ghost.request.valid then
+        ghost.request.destroy()
+        ghost.request = nil
+      end
+    end
+    if ghost.fuel then
+      local inventory = ghost.entity.get_inventory(defines.inventory.fuel)
+      if inventory.get_item_count(ghost.fuel) >= game.item_prototypes[ghost.fuel].stack_size then
+        -- Fuel is full
+        if ghost.request and ghost.request.valid then
+          ghost.request.destroy()
+          ghost.request = nil
+        end
+      end
+    end
+    if not ghost.request or not ghost.request.valid then
+      -- Everything is finished
+      set_auto_mode(ghost)
+      ghost.entity = nil
       return destroy_ghost(ghost_index)
     end
   end
@@ -472,24 +488,15 @@ function request_items(ghost)
   ghost.requested_items = true
 end
 
-function set_auto_mode(train, auto)
-  local finished = true
-  for c = 1, #train.carriages do
-    for i = 1, #global.ghosts do
-      local ghost = global.ghosts[i]
-      if ghost.entity
-      and ghost.entity.valid
-      and ghost.entity == train.carriages[c]
-      and ghost.request
-      and ghost.request.valid then
-        -- Wait for all requests to be filled
-        finished = false
-      end
+function set_auto_mode(ghost)
+  for i = 1, #global.ghosts do
+    if global.ghosts[i].train_id == ghost.train_id
+    and global.ghosts[i].entity ~= ghost.entity then
+      -- There is another unfinished ghost in this train
+      return
     end
   end
-  if finished then
-    train.manual_mode = not auto
-  end
+  ghost.entity.train.manual_mode = not ghost.auto
 end
 
 function calculate_offset(table1, table2, offset)
@@ -526,6 +533,24 @@ function calculate_offset(table1, table2, offset)
 end
 
 function serialize_data(entities)
+  -- Recalculate train ids
+  local train_ids = {}
+  for _, entity in pairs(entities) do
+    if entity.type == "locomotive"
+    or entity.type == "cargo-wagon"
+    or entity.type == "fluid-wagon"
+    or entity.type == "artillery-wagon" then
+      if not train_ids[entity.train.id] then
+        train_ids[entity.train.id] = 1
+      end
+    end
+  end
+  local id = 1
+  for k,_ in pairs(train_ids) do
+    train_ids[k] = id
+    id = id + 1
+  end
+
   local result = {}
   for _, entity in pairs(entities) do
     local data = {}
@@ -538,16 +563,12 @@ function serialize_data(entities)
     or entity.type == "cargo-wagon"
     or entity.type == "fluid-wagon"
     or entity.type == "artillery-wagon" then
-      local orientation = math.floor(entity.orientation * 256 + 0.5)
-      if orientation > 255 then orientiation = 0 end
-      local direction = get_direction(orientation/256)
-      local train = entity.train
-      local length = #train.carriages
-      data.direction = direction
-      data.auto = not train.manual_mode
+      local orientation = math.floor(entity.orientation * 256 + 0.5) % 256
+      data.direction = get_direction(orientation/256)
+      data.auto = not entity.train.manual_mode
       data.signals = serialize_signals(entity)
-      -- Write orientation and train length
-      local b2, b3, b4 = unpack_bytes(length, 3)
+      -- Write orientation and train id
+      local b2, b3, b4 = unpack_bytes(train_ids[entity.train.id], 3)
       data.signals[1].count = pack_signal(orientation, b2, b3, b4)
     end
 
@@ -714,17 +735,17 @@ function serialize_signals(entity)
   return signals
 end
 
-function unserialize_signals(ghost, signals)
-  -- Read length and orientation
+function unserialize_signals(ghost, signals, blueprint)
+  -- Read orientation and train id
   local i = 1
   local signal = signals[i] or EMPTY_SIGNAL
   i = i + 1
   local b1, b2, b3, b4 = unpack_signal(signal.count)
   ghost.orientation = b1 / 256
-  ghost.length = pack_bytes(b2, b3, b4)
+  ghost.train_id = get_train_id(pack_bytes(b2, b3, b4), blueprint)
   local direction_shift = ghost.direction - get_direction(ghost.orientation)
   ghost.orientation = ghost.orientation + direction_shift/8
-  if ghost.orientation > 1 then ghost.orientation = orientation - 1 end
+  if ghost.orientation >= 1 then ghost.orientation = orientation - 1 end
   if ghost.orientation < 0 then ghost.orientation = orientation + 1 end
 
   local type = game.entity_prototypes[ghost.name].type
@@ -807,10 +828,7 @@ function unserialize_signals(ghost, signals)
             -- Ticks are not needed, we can use the bytes for something else
             local condition = { first_signal = signal.signal }
             -- Byte 2: comparator
-            if b2 < 1 or b2 > #COMPARATORS then
-              b2 = 1
-            end
-            condition.comparator = COMPARATORS[b2]
+            condition.comparator = COMPARATORS[b2] or COMPARATORS[1]
 
             -- Byte 3: wildcard signal, everything=1, anything=2
             if b3 == 1 then
@@ -824,10 +842,9 @@ function unserialize_signals(ghost, signals)
             signal = signals[i] or EMPTY_SIGNAL
             i = i + 1
             condition.second_signal = signal.signal
-            local constant = signal.count
             if condition.second_signal.name == "blueprint-train-combinator-" .. ghost.name then
               -- It's a constant
-              condition.constant = constant
+              condition.constant = signal.count
               condition.second_signal = nil
             end
 
@@ -876,6 +893,22 @@ function get_direction(orientation)
   return math.floor(orientation * 4 + 0.5) * 2 % 8
 end
 
+function get_train_id(id, blueprint)
+  -- Allow duplicate train ids if they are built
+  -- from the same blueprint in the same tick.
+  local key = nil
+  if blueprint and blueprint.valid and blueprint.item_number then
+    key = blueprint.item_number .. "-" .. id
+    if global.train_id_cache[key] then
+      return global.train_id_cache[key]
+    end
+  end
+  -- Generate a new id
+  global.last_train_id = global.last_train_id + 1
+  if key then global.train_id_cache[key] = global.last_train_id end
+  return global.last_train_id
+end
+
 function pack_signal(b1, b2, b3, b4)
   local n = pack_bytes(b1, b2, b3, b4)
   if n > 2147483647 then n = n - 4294967296 end
@@ -905,7 +938,21 @@ function unpack_bytes(n, count)
   return unpack(result)
 end
 
+function on_configuration_changed(data)
+  local old_version = data.mod_changes["blueprint-train"].old_version
+
+  -- Version 0.16.9 adds new train_id format
+  if old_version and tonumber(old_version:sub(6)) < 9 then
+    global.train_id_cache = {}
+    global.last_train_id = 0
+    for i = 1, #global.ghosts do
+      global.ghosts[i].train_id = -1 * (global.ghosts[i].length or 0)
+    end
+  end
+end
+
 script.on_init(on_init)
+script.on_configuration_changed(on_configuration_changed)
 script.on_event(defines.events.on_player_created, on_player_created)
 script.on_event(defines.events.on_gui_opened, on_gui_opened)
 script.on_event(defines.events.on_gui_click, on_gui_click)
