@@ -264,11 +264,10 @@ function on_tick()
   global.train_id_cache = {}
 end
 
+-- Update the 3 entities used in the fake ghost:
+-- simple-entity, container, and item-request-proxy.
+-- Returns the number to add to increment the current ghost.
 function update_ghost(ghost_index)
-  -- Update the 3 entities used in the fake ghost:
-  -- simple-entity, container, and item-request-proxy.
-  -- Returns the number to add to increment the current ghost.
-
   local ghost = global.ghosts[ghost_index]
   if not ghost or not ghost.entity or not ghost.entity.valid then
     return destroy_ghost(ghost_index)
@@ -387,11 +386,10 @@ function update_ghost(ghost_index)
   return 1
 end
 
+-- Returns false if the ghost is unbuildable (due to missing rails).
+-- Returns true if a player is blocking the ghost, even though it wasn't revived.
+-- Check ghost.revived to see if it was really revived.
 function revive_ghost(ghost)
-  -- Returns false if the ghost is unbuildable (due to missing rails).
-  -- Returns true if a player is blocking the ghost, even though it wasn't revived.
-  -- Check ghost.revived to see if it was really revived.
-
   -- Destroy the request, so it can't collide with the revived train
   if ghost.request and ghost.request.valid then
     ghost.request.destroy()
@@ -454,12 +452,10 @@ function revive_ghost(ghost)
   return true
 end
 
+-- Returns the number to add to increment the current ghost.
 function destroy_ghost(ghost_index, keep_auto_mode)
-  -- Returns the number to add to increment the current ghost.
   local ghost = global.ghosts[ghost_index]
-  if not ghost then
-    return 1
-   end
+  if not ghost then return 1 end
 
   if ghost.entity and ghost.entity.valid then
     ghost.entity.destroy()
@@ -519,7 +515,7 @@ function set_auto_mode(ghost)
   ghost.entity.train.manual_mode = not ghost.auto
 end
 
-function calculate_offset(table1, table2, offset)
+function calculate_offset(table1, table2)
   -- Pick a random entity from table 1
   local entity = table1[1]
 
@@ -878,16 +874,6 @@ function unserialize_signals(ghost, signals, blueprint)
   end
 end
 
-function signal_exists(signal)
-  if not signal then return false end
-  if not signal.name then return false end
-  if not signal.type then return false end
-  if signal.type == "item" then return game.item_prototypes[signal.name] end
-  if signal.type == "fluid" then return game.fluid_prototypes[signal.name] end
-  if signal.type == "virtual" then return game.virtual_signal_prototypes[signal.name] end
-  return false
-end
-
 function get_direction(orientation)
   return math.floor(orientation * 4 + 0.5) * 2 % 8
 end
@@ -929,6 +915,16 @@ function set_schedule(train, schedule)
     end
   end
   train.schedule = s
+end
+
+function signal_exists(signal)
+  if not signal then return false end
+  if not signal.name then return false end
+  if not signal.type then return false end
+  if signal.type == "item" then return game.item_prototypes[signal.name] end
+  if signal.type == "fluid" then return game.fluid_prototypes[signal.name] end
+  if signal.type == "virtual" then return game.virtual_signal_prototypes[signal.name] end
+  return false
 end
 
 function pack_signal(b1, b2, b3, b4)
