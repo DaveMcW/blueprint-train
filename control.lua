@@ -60,7 +60,8 @@ function on_player_setup_blueprint(event)
   global.new_data[event.player_index] = nil
 
   local area = event.area
-  if not area or (area.right_bottom.x - area.left_top.x) * (area.right_bottom.y - area.left_top.y) < 1  then
+  if not area
+  or (area.right_bottom.x - area.left_top.x) * (area.right_bottom.y - area.left_top.y) < 1 then
     -- No area selected
     return
   end
@@ -166,21 +167,20 @@ function on_put_item(event)
   or entity.type == "cargo-wagon"
   or entity.type == "fluid-wagon"
   or entity.type == "artillery-wagon" then
-    local data = {
+    entity = player.surface.create_entity{
       name = "blueprint-train-combinator-" .. entity.name,
       position = event.position,
       direction = event.direction,
       force = player.force,
-      build_check_type = defines.build_check_type.manual,
     }
-    if not player.surface.can_place_entity(data) then return end
-    entity = player.surface.create_entity(data)
     if not entity then return end
     -- Write orientation
-    entity.get_or_create_control_behavior().set_signal(1, {
+    local behavior = entity.get_or_create_control_behavior()
+    behavior.set_signal(1, {
       signal = {name="signal-1", type="virtual"},
       count = pack_signal(event.direction * 32, 0, 0, 0),
     })
+    behavior.enabled = false
     on_built_entity{created_entity = entity}
   end
 end
@@ -225,15 +225,47 @@ function build_ghost(combinator, blueprint)
     name = "blueprint-train-ghost-ew-" .. entity_name
   end
 
-  local entity = {
+  -- Check for train collisions
+  local combinator_data = {
+    name = "blueprint-train-combinator-"..entity_name,
+    position = combinator.position,
+    direction = combinator.direction,
+    force = combinator.force,
+    build_check_type = defines.build_check_type.manual,
+  }
+  -- Check for ghost collisions
+  local data = {
     name = name,
     position = combinator.position,
     force = combinator.force,
     build_check_type = defines.build_check_type.ghost_place,
   }
-  if combinator.surface.can_place_entity(entity) then
-    ghost.entity = combinator.surface.create_entity(entity)
+  local surface = combinator.surface
+  combinator.destroy()
+
+  local combinator_allowed = surface.can_place_entity(combinator_data)
+  if not combinator_allowed then
+    -- Maybe a player or vehicle is blocking it?
+    -- We only need to avoid train collisions
+    local box = game.entity_prototypes[name].collision_box
+    local area = {
+      {data.position.x + box.left_top.x - 1, data.position.y + box.left_top.y + 1},
+      {data.position.x + box.right_bottom.x - 1, data.position.y + box.right_bottom.y + 1},
+    }
+    if 0 == surface.count_entities_filtered{
+      type = {"locomotive", "cargo-wagon", "fluid-wagon", "artillery-wagon"},
+      area = area,
+    } then
+      combinator_allowed = true
+    end
+  end
+  local ghost_allowed = surface.can_place_entity(data)
+  if combinator_allowed and ghost_allowed then
+    ghost.entity = surface.create_entity(data)
+  end
+  if ghost.entity then
     ghost.entity.destructible = false
+
     -- Pick the correct graphics_variation
     if orientation < 5/16 or orientation >= 15/16 then
       ghost.entity.graphics_variation = 1
@@ -245,12 +277,10 @@ function build_ghost(combinator, blueprint)
     elseif orientation >= 13/16 and orientation < 15/16 then
       ghost.entity.graphics_variation = 4
     end
-    table.insert(global.ghosts, ghost)
 
+    table.insert(global.ghosts, ghost)
     update_ghost(#global.ghosts)
   end
-
-  combinator.destroy()
 end
 
 function on_tick()
@@ -306,7 +336,7 @@ function update_ghost(ghost_index)
         position = ghost.entity.position,
         force = ghost.entity.force,
       }
-      ghost.chest.destructible = false
+      if ghost.chest then ghost.chest.destructible = false end
       ghost.request = ghost.entity.surface.create_entity{
         name = "blueprint-train-item-request",
         position = ghost.entity.position,
@@ -318,8 +348,7 @@ function update_ghost(ghost_index)
       return 1
     end
 
-    if not ghost.chest
-    or not ghost.chest.valid then
+    if not ghost.chest or not ghost.chest.valid then
       -- The chest has been destroyed, destroy the ghost too
       return destroy_ghost(ghost_index)
     end
@@ -407,7 +436,7 @@ function revive_ghost(ghost)
     return false
   end
   local entity = ghost.entity.surface.create_entity(data)
-  if not entity or not entity.valid then
+  if not entity then
     -- Something is blocking it
     return true
   end
@@ -418,7 +447,7 @@ function revive_ghost(ghost)
     entity.destroy()
     data.direction = (data.direction + 4) % 8
     entity = ghost.entity.surface.create_entity(data)
-    if not entity or not entity.valid then
+    if not entity then
       -- Something is blocking it
       return true
     end
