@@ -2,6 +2,7 @@
 Version: 0.16.12
 Date: 09. 08. 2018
   Bugfixes:
+    - Fixed empty circuit condition causing corrupt blueprints.
     - Fixed that ghost trains could be force-built on top of existing trains.
 ---------------------------------------------------------------------------------------------------
 Version: 0.16.11

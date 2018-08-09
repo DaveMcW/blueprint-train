@@ -3,7 +3,8 @@ require "util"
 
 local WAIT_CONDITIONS = {"time", "inactivity", "full", "empty", "item_count", "circuit", "robots_inactive", "fluid_count"}
 local COMPARATORS = {"<", ">", "=", "≥", "≤", "≠"}
-local EMPTY_SIGNAL = {count = 0, signal = {name="signal-1", type="virtual"}}
+local SCHEDULE_MAX_LENGTH = 1000
+local WAIT_CONDITION_MAX_LENGTH = 1000
 
 function on_init()
   global.disabled = {}
@@ -717,7 +718,8 @@ function serialize_signals(entity)
               end
             end
             if type_id then
-              local signal = {name = "signal-1", type = "virtual"}
+              -- Use the combinator as a placeholder for empty signal
+              local signal = {name = "blueprint-train-combinator-" .. entity.name, type = "item"}
               local ticks = 0
               if wait_condition.ticks then
                 ticks = math.min(wait_condition.ticks, 134217727)
@@ -727,9 +729,6 @@ function serialize_signals(entity)
               b1 = b1 + and_or * 128 + type_id * 8
 
               if wait_condition.condition then
-                -- Write the first signal
-                signal.name = wait_condition.condition.first_signal.name
-                signal.type = wait_condition.condition.first_signal.type
                 -- Ticks are not needed, we can use the bytes for something else
                 -- Byte 2: comparator
                 b2 = 1
@@ -745,27 +744,28 @@ function serialize_signals(entity)
                   if signal.name == "signal-everything" then b3 = 1 end
                   if signal.name == "signal-anything" then b3 = 2 end
                 end
-                if b3 > 0 then
-                  -- Can't write wildcard signal to constant combinator.
-                  -- Use the custom combinator signal since it exists
-                  -- but will never be used in a player circuit condition.
-                  signal.name = "blueprint-train-combinator-" .. entity.name
-                  signal.type = "item"
+                if b3 == 0 then
+                  -- Write the first signal
+                  signal.name = wait_condition.condition.first_signal.name
+                  signal.type = wait_condition.condition.first_signal.type
                 end
               end
               local n = pack_signal(b1, b2, b3, b4)
               table.insert(signals, {index=i, count=n, signal=signal})
               i = i + 1
 
-              if wait_condition.condition then
+              if wait_condition.type == "item_count"
+              or wait_condition.type == "circuit"
+              or wait_condition.type == "fluid_count" then
                 -- Write the second signal
-                -- Use the custom combinator signal to store the constant
                 signal = {name = "blueprint-train-combinator-" .. entity.name, type="item"}
                 local constant = 0
-                if wait_condition.condition.second_signal then
-                  signal = wait_condition.condition.second_signal
-                else
-                  constant = wait_condition.condition.constant
+                if wait_condition.condition then
+                  if wait_condition.condition.second_signal then
+                    signal = wait_condition.condition.second_signal
+                  else
+                    constant = wait_condition.condition.constant
+                  end
                 end
                 table.insert(signals, {index=i, count=constant, signal=signal})
                 i = i + 1
@@ -781,8 +781,9 @@ function serialize_signals(entity)
 end
 
 function unserialize_signals(ghost, signals, blueprint)
-  -- Read orientation and train id
+  local EMPTY_SIGNAL = {count = 0, signal = {name="signal-1", type="virtual"}}
   local i = 1
+  -- Read orientation and train id
   local signal = signals[i] or EMPTY_SIGNAL
   i = i + 1
   local b1, b2, b3, b4 = unpack_signal(signal.count)
@@ -827,6 +828,8 @@ function unserialize_signals(ghost, signals, blueprint)
     b1, b2, b3, b4 = unpack_signal(signal.count)
     local schedule_length = pack_bytes(b1, b2)
     local current = pack_bytes(b3, b4)
+    schedule_length = math.min(schedule_length, SCHEDULE_MAX_LENGTH)
+    current = math.min(current, SCHEDULE_MAX_LENGTH)
 
     if schedule_length > 0 then
       ghost.schedule = { current = current, records = {} }
@@ -836,6 +839,7 @@ function unserialize_signals(ghost, signals, blueprint)
         i = i + 1
         b1, b2, b3, b4 = unpack_signal(signal.count)
         local condition_length = pack_bytes(b1, b2)
+        condition_length = math.min(condition_length, WAIT_CONDITION_MAX_LENGTH)
         local name_length = b3
         local name = string.char(b4)
 
@@ -872,9 +876,12 @@ function unserialize_signals(ghost, signals, blueprint)
           if type == "item_count" or type == "circuit" or type == "fluid_count" then
             -- Ticks are not needed, we can use the bytes for something else
             local condition = { first_signal = signal.signal }
+            if signal.signal.name == "blueprint-train-combinator-" .. ghost.name then
+              -- Empty signal
+              condition.first_signal = {type="virtual"}
+            end
             -- Byte 2: comparator
             condition.comparator = COMPARATORS[b2] or COMPARATORS[1]
-
             -- Byte 3: wildcard signal, everything=1, anything=2
             if b3 == 1 then
               condition.first_signal = {name="signal-everything", type="virtual"}
@@ -892,7 +899,6 @@ function unserialize_signals(ghost, signals, blueprint)
               condition.constant = signal.count
               condition.second_signal = nil
             end
-
             wait_condition.condition = condition
           end
           table.insert(record.wait_conditions, wait_condition)
