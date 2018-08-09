@@ -1,4 +1,5 @@
-require("mod-gui")
+require "mod-gui"
+require "util"
 
 local WAIT_CONDITIONS = {"time", "inactivity", "full", "empty", "item_count", "circuit", "robots_inactive", "fluid_count"}
 local COMPARATORS = {"<", ">", "=", "≥", "≤", "≠"}
@@ -170,6 +171,7 @@ function on_put_item(event)
       position = event.position,
       direction = event.direction,
       force = player.force,
+      build_check_type = defines.build_check_type.manual,
     }
     if not player.surface.can_place_entity(data) then return end
     entity = player.surface.create_entity(data)
@@ -326,38 +328,14 @@ function update_ghost(ghost_index)
     if ghost.chest.get_item_count(item_name) > 0
     and ghost.chest.remove_item{name = item_name, count = 1} > 0 then
       -- We have the train item
-
-      if revive_ghost(ghost) then
-        -- Count the remaining ghosts in this train
-        local train_complete = true
-        for i = 1, #global.ghosts do
-          if global.ghosts[i].train_id == ghost.train_id
-          and not global.ghosts[i].revived then
-            train_complete = false
-            break
-          end
-        end
-        if train_complete then
-          -- The train is complete, now it is safe to make item requests
-          for i = 1, #global.ghosts do
-            if global.ghosts[i].train_id == ghost.train_id then
-              request_items(global.ghosts[i])
-            end
-          end
-        end
-
-        return 1
-      else
+      local success = revive_ghost(ghost)
+      if not ghost.revived then
         -- Refund the item
         ghost.chest.insert{name = item_name, count = 1}
+      end
+      if not success then
         return destroy_ghost(ghost_index)
       end
-    end
-
-    if not ghost.request
-    or not ghost.request.valid then
-      -- The request has been destroyed, destroy the ghost too
-      return destroy_ghost(ghost_index)
     end
   end
 
@@ -384,7 +362,25 @@ function update_ghost(ghost_index)
       -- Everything is finished
       set_auto_mode(ghost)
       ghost.entity = nil
-      return destroy_ghost(ghost_index)
+      return destroy_ghost(ghost_index, true)
+    end
+
+  elseif ghost.revived then
+    -- Don't request items until every ghost in the train has been revived
+    local train_complete = true
+    for i = 1, #global.ghosts do
+      if global.ghosts[i].train_id == ghost.train_id
+      and not global.ghosts[i].revived then
+        train_complete = false
+        break
+      end
+    end
+    if train_complete then
+      request_items(ghost)
+      if ghost.schedule then
+        -- Set schedule again, in case we lost it while merging with other trains
+        set_schedule(ghost.entity.train, ghost.schedule)
+      end
     end
   end
 
@@ -392,6 +388,10 @@ function update_ghost(ghost_index)
 end
 
 function revive_ghost(ghost)
+  -- Returns false if the ghost is unbuildable (due to missing rails).
+  -- Returns true if a player is blocking the ghost, even though it wasn't revived.
+  -- Check ghost.revived to see if it was really revived.
+
   -- Destroy the request, so it can't collide with the revived train
   if ghost.request and ghost.request.valid then
     ghost.request.destroy()
@@ -402,9 +402,17 @@ function revive_ghost(ghost)
     position = ghost.entity.position,
     direction = ghost.direction,
     force = ghost.entity.force,
+    build_check_type = defines.build_check_type.script,
   }
+  if not ghost.entity.surface.can_place_entity(data) then
+    -- No rails to build on
+    return false
+  end
   local entity = ghost.entity.surface.create_entity(data)
-  if not entity or not entity.valid then return false end
+  if not entity or not entity.valid then
+    -- Something is blocking it
+    return true
+  end
 
   local direction = get_direction(entity.orientation)
   if direction ~= ghost.direction then
@@ -412,7 +420,10 @@ function revive_ghost(ghost)
     entity.destroy()
     data.direction = (data.direction + 4) % 8
     entity = ghost.entity.surface.create_entity(data)
-    if not entity or not entity.valid then return false end
+    if not entity or not entity.valid then
+      -- Something is blocking it
+      return true
+    end
   end
 
   if entity.type == "cargo-wagon" and ghost.wagon_filters then
@@ -426,8 +437,7 @@ function revive_ghost(ghost)
 
   if entity.type == "locomotive" then
     if ghost.schedule then
-      validate_schedule(ghost.schedule)
-      entity.train.schedule = ghost.schedule
+      set_schedule(entity.train, ghost.schedule)
     end
 
     if ghost.color then
@@ -444,10 +454,10 @@ function revive_ghost(ghost)
   return true
 end
 
-function destroy_ghost(ghost_index)
+function destroy_ghost(ghost_index, keep_auto_mode)
+  -- Returns the number to add to increment the current ghost.
   local ghost = global.ghosts[ghost_index]
   if not ghost then
-    -- Increment the current ghost
     return 1
    end
 
@@ -467,8 +477,18 @@ function destroy_ghost(ghost_index)
     end
     ghost.chest.destroy()
   end
+
+  if not keep_auto_mode then
+    -- Removing a carriage cancels auto mode
+    for i = 1, #global.ghosts do
+      if global.ghosts[i].train_id == ghost.train_id then
+        global.ghosts[i].auto = false
+      end
+    end
+  end
+
   table.remove(global.ghosts, ghost_index)
-  -- We shrunk the ghost table instead of incrementing the current ghost
+  -- We shrank the ghost table instead of incrementing the current ghost
   return 0
 end
 
@@ -858,27 +878,6 @@ function unserialize_signals(ghost, signals, blueprint)
   end
 end
 
-function validate_schedule(schedule)
-  -- The schedule may contain mod items that no longer exist
-  -- Remove them to prevent script errors
-  if schedule and schedule.records then
-    for _, r in pairs(schedule.records) do
-      if r.wait_conditions then
-        for _, w in pairs(r.wait_conditions) do
-          if w.condition then
-            if not signal_exists(w.condition.first_signal) then
-              w.condition.first_signal = nil
-            end
-            if not signal_exists(w.condition.second_signal) then
-              w.condition.second_signal = nil
-            end
-          end
-        end
-      end
-    end
-  end
-end
-
 function signal_exists(signal)
   if not signal then return false end
   if not signal.name then return false end
@@ -907,6 +906,29 @@ function get_train_id(id, blueprint)
   global.last_train_id = global.last_train_id + 1
   if key then global.train_id_cache[key] = global.last_train_id end
   return global.last_train_id
+end
+
+function set_schedule(train, schedule)
+  local s = util.table.deepcopy(schedule)
+  -- The schedule may contain mod items that no longer exist
+  -- Remove them to prevent script errors
+  if s and s.records then
+    for _, record in pairs(schedule.records) do
+      if record.wait_conditions then
+        for _, w in pairs(record.wait_conditions) do
+          if w.condition then
+            if not signal_exists(w.condition.first_signal) then
+              w.condition.first_signal = nil
+            end
+            if not signal_exists(w.condition.second_signal) then
+              w.condition.second_signal = nil
+            end
+          end
+        end
+      end
+    end
+  end
+  train.schedule = s
 end
 
 function pack_signal(b1, b2, b3, b4)
