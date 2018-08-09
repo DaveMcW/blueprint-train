@@ -23,3 +23,5 @@ Diagonal trains do not display properly in blueprint preview.
 Shift-click uses 4 directions, the train preview uses 2 directions, and they don't merge correctly.
 
 Trains cannot travel through ghost trains, and manually building on top of ghost trains does not work. ([fixed in Factorio 0.17](https://forums.factorio.com/viewtopic.php?f=7&t=61842))
+
+Construction robots do not hover over blocked ghost trains.
