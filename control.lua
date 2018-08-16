@@ -38,9 +38,8 @@ end
 
 function on_gui_click(event)
   if event.element.name == "blueprint-train-button" then
-    local player = game.players[event.player_index]
-    global.disabled[player.index] = not global.disabled[player.index]
-    update_button(event.element, global.disabled[player.index])
+    global.disabled[event.player_index] = not global.disabled[event.player_index]
+    update_button(event.element, global.disabled[event.player_index])
   end
 end
 
@@ -454,12 +453,17 @@ function revive_ghost(ghost)
     end
   end
 
-  if entity.type == "cargo-wagon" and ghost.wagon_filters then
+  if entity.type == "cargo-wagon" then
     local inventory = entity.get_inventory(defines.inventory.cargo_wagon)
-    for i = 1, #inventory do
-      if ghost.wagon_filters[i] and game.item_prototypes[ghost.wagon_filters[i]] then
-        inventory.set_filter(i, ghost.wagon_filters[i])
+    if ghost.wagon_filters then
+      for i = 1, #inventory do
+        if ghost.wagon_filters[i] and game.item_prototypes[ghost.wagon_filters[i]] then
+          inventory.set_filter(i, ghost.wagon_filters[i])
+        end
       end
+    end
+    if ghost.bar and ghost.bar >= 1 and inventory.hasbar() then
+      inventory.setbar(ghost.bar)
     end
   end
 
@@ -627,8 +631,8 @@ function serialize_signals(entity)
   local signals = { {index=1, count=0, signal={name="signal-1", type="virtual"}} }
 
   if entity.type == "cargo-wagon" then
-    -- Write wagon filters
     local inventory = entity.get_inventory(defines.inventory.cargo_wagon)
+    -- Write wagon filters
     if inventory.is_filtered() then
       for i = 1, #inventory do
         local filter = inventory.get_filter(i)
@@ -641,6 +645,18 @@ function serialize_signals(entity)
           end
         end
       end
+    end
+    -- Write bar
+    if inventory.hasbar() then
+      local signal2 = nil
+      for _,s in pairs(signals) do
+        if s.index == 2 then signal2 = s end
+      end
+      if not signal2 then
+        signal2 = {index=2, count=0, signal={name="signal-1", type="virtual"}}
+        table.insert(signals, signal2)
+      end
+      signal2.count = inventory.getbar()
     end
   elseif entity.type == "locomotive" then
     -- Write fuel
@@ -796,11 +812,15 @@ function unserialize_signals(ghost, signals, blueprint)
 
   local type = game.entity_prototypes[ghost.name].type
   if type == "cargo-wagon" then
-    -- Read wagon filters
     ghost.wagon_filters = {}
     for _, s in pairs(signals) do
+      -- Read wagon filters
       if s.signal.type == "item" then
         ghost.wagon_filters[s.index] = s.signal.name
+      end
+      -- Read bar
+      if s.index == 2 then
+        ghost.bar = s.count
       end
     end
   elseif type == "locomotive" then
