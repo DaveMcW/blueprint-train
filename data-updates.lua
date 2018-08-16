@@ -48,7 +48,7 @@ function add_prototypes(entity)
     combinator.item_slot_count = 1000
   elseif entity.type == "cargo-wagon" then
     -- One slot for every inventory filter
-    -- Uses the second slot to store lock bar
+    -- Uses the second slot to store limit bar
     combinator.item_slot_count = math.max(entity.inventory_size, 2)
   else
     combinator.item_slot_count = 1
