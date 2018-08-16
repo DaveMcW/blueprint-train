@@ -133,14 +133,17 @@ function add_to_blueprint(data, blueprint)
     or entity.type == "cargo-wagon"
     or entity.type == "fluid-wagon"
     or entity.type == "artillery-wagon" then
-      local data = {
-        entity_number = #blueprint_entities + 1,
-        name = "blueprint-train-combinator-" .. entity.name,
-        position = {entity.position.x - offset.x, entity.position.y - offset.y},
-        direction = entity.direction,
-        control_behavior = {filters = entity.signals, is_on = entity.auto},
-      }
-      table.insert(blueprint_entities, data)
+      local name = "blueprint-train-combinator-" .. entity.name
+      if game.entity_prototypes[name] then
+        local data = {
+          entity_number = #blueprint_entities + 1,
+          name = name,
+          position = {entity.position.x - offset.x, entity.position.y - offset.y},
+          direction = entity.direction,
+          control_behavior = {filters = entity.signals, is_on = entity.auto},
+        }
+        table.insert(blueprint_entities, data)
+      end
     end
     blueprint.set_blueprint_entities(blueprint_entities)
   end
