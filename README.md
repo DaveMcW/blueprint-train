@@ -3,7 +3,7 @@ Adds support for trains in blueprints.
 ## Features
 Locomotive schedule, fuel, and color.
 
-Cargo wagon filters.
+Cargo wagon filters and size limit.
 
 Automatic mode.
 
