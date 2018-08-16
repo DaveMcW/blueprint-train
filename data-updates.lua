@@ -16,11 +16,12 @@ function add_prototypes(entity)
   for _,i in pairs(data.raw["item-with-entity-data"]) do
     if i.place_result == entity.name then
       item.icon = i.icon
+      item.icons = i.icons
       item.icon_size = i.icon_size
       break
     end
   end
-  if not item.icon then
+  if not item.icon and not item.icons then
     -- The entity is not buildable, abort!
     return
   end
@@ -154,7 +155,8 @@ end
 
 function copy_layers(entity, layers, pictures, direction)
     if not entity[pictures] then return end
-    for _, source in pairs(entity[pictures].layers) do
+    local sources = entity[pictures].layers -- or {entity[pictures]}
+    for _, source in pairs(sources) do
       local layer = table.deepcopy(source)
       fix_graphics(entity, layer, pictures, direction)
       if layer.hr_version then
