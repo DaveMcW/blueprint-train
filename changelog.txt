@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.16.14
+Date: 16. 08. 2018
+  Bugfixes:
+    - Now compatible with single-layer train graphics.
+    - Fixed that trains with layered item.icons were unbuildable.
+    - Fixed script error when blueprinting unbuildable trains.
+---------------------------------------------------------------------------------------------------
 Version: 0.16.13
 Date: 16. 08. 2018
   Features:

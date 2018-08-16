@@ -155,7 +155,7 @@ end
 
 function copy_layers(entity, layers, pictures, direction)
     if not entity[pictures] then return end
-    local sources = entity[pictures].layers -- or {entity[pictures]}
+    local sources = entity[pictures].layers or {entity[pictures]}
     for _, source in pairs(sources) do
       local layer = table.deepcopy(source)
       fix_graphics(entity, layer, pictures, direction)
@@ -194,6 +194,17 @@ function copy_wheels(entity, layers, wheel_direction, direction)
 end
 
 function fix_graphics(entity, layer, pictures, direction)
+  if layer.direction_count
+  and layer.filenames
+  and layer.line_length
+  and layer.lines_per_file
+  and layer.width
+  and layer.height then
+    -- We have enough data to work with
+  else
+    return
+  end
+
   if layer.apply_runtime_tint then
     layer.tint = entity.color
   end
