@@ -485,7 +485,7 @@ function revive_ghost(ghost)
   end
   ghost.entity = entity
   ghost.revived = true
-
+  script.raise_event(defines.events.script_raised_built, {created_entity = entity})
   return true
 end
 
