@@ -1,7 +1,113 @@
 local TRAIN_WHEEL_VERTICAL_SHIFT = -0.25 -- Magic wheel shift constant
 local GHOST_TINT = {r=0.6, g=0.6, b=0.6, a=0.3}
 
-function add_prototypes(entity)
+local function orientation_bias(n)
+  -- There are more horizontal train sprites than vertical
+  -- so we need to bias our sprite picking function to match.
+  -- The graphic artists probably used a different function,
+  -- but this is accurate for the 8 directions I care about.
+  n = (n - math.floor(n)) * 4
+  local whole = math.floor(n)
+  local fraction = n - whole
+  if whole % 2 == 0 then
+    fraction = math.pow(fraction, 1.35)
+  else
+    fraction = 1 - math.pow(1 - fraction, 1.35)
+  end
+  return (whole + fraction) / 4
+end
+
+local function fix_graphics(entity, layer, pictures, direction)
+  if layer.direction_count
+  and layer.filenames
+  and layer.line_length
+  and layer.lines_per_file
+  and layer.width
+  and layer.height then
+    -- We have enough data to work with
+  else
+    -- Disable this layer
+    layer.filename = "__core__/graphics/empty.png"
+    layer.width = 1
+    layer.height = 1
+    layer.x = 0
+    layer.y = 0
+    return
+  end
+
+  if layer.apply_runtime_tint then
+    layer.tint = entity.color
+  end
+  local count = layer.direction_count
+  if layer.back_equals_front then
+    count = count * 2
+  end
+  local orientation = (math.floor(count * orientation_bias(direction / 8) + 0.5) % layer.direction_count)
+  local file = math.floor(orientation / (layer.line_length * layer.lines_per_file))
+  layer.filename = layer.filenames[file + 1]
+  local slot = orientation - file * layer.line_length * layer.lines_per_file
+  layer.x = layer.width * (slot % layer.line_length)
+  layer.y = layer.height * math.floor(slot / layer.line_length)
+  if pictures == "cannon_barrel_pictures" or pictures == "cannon_base_pictures" then
+    local cannon_shift = entity.cannon_base_shiftings[orientation + 1]
+    if not layer.shift then layer.shift = {0,0} end
+    layer.shift = {layer.shift[1] + cannon_shift[1], layer.shift[2] + cannon_shift[2]}
+  end
+end
+
+local function copy_wheels(entity, layers, wheel_direction, direction)
+  if not entity.wheels then return end
+  local j = entity.joint_distance/2 * wheel_direction
+  local s45 = {x=0.64, y=0.67} -- Shift factor for 45 degree angle
+  local wheel_shifts = {
+    [0] = {0, j},
+    [1] = {-j * s45.x, j * s45.y},
+    [2] = {-j, 0},
+    [3] = {-j * s45.x, -j * s45.y},
+    [4] = {0, -j},
+    [5] = {j * s45.x, -j * s45.y},
+    [6] = {j, 0},
+    [7] = {j * s45.x, j * s45.y},
+  }
+  local shift = wheel_shifts[direction]
+  shift[2] = shift[2] + TRAIN_WHEEL_VERTICAL_SHIFT
+  if wheel_direction == -1 then direction = (direction + 4) % 8 end
+  local layer = table.deepcopy(entity.wheels)
+  layer.shift = shift
+  fix_graphics(entity, layer, pictures, direction)
+  if layer.hr_version then
+    layer.hr_version.shift = shift
+    fix_graphics(entity, layer.hr_version, pictures, direction)
+  end
+  table.insert(layers, layer)
+end
+
+local function copy_layers(entity, layers, pictures, direction)
+    if not entity[pictures] then return end
+    local sources = entity[pictures].layers or {entity[pictures]}
+    for _, source in pairs(sources) do
+      local layer = table.deepcopy(source)
+      fix_graphics(entity, layer, pictures, direction)
+      if layer.hr_version then
+        fix_graphics(entity, layer.hr_version, pictures, direction)
+      end
+      table.insert(layers, layer)
+  end
+end
+
+local function get_train_layers(entity, direction)
+  local layers = {}
+  copy_wheels(entity, layers, 1, direction)
+  copy_wheels(entity, layers, -1, direction)
+  copy_layers(entity, layers, "pictures", direction)
+  if entity.type == "artillery-wagon" then
+    copy_layers(entity, layers, "cannon_barrel_pictures", direction)
+    copy_layers(entity, layers, "cannon_base_pictures", direction)
+  end
+  return layers
+end
+
+local function add_prototypes(entity)
   local item = {
     type = "item",
     name = "blueprint-train-combinator-" .. entity.name,
@@ -32,6 +138,7 @@ function add_prototypes(entity)
   combinator.localised_name = {"entity-name." .. entity.name}
   combinator.flags = {"player-creation", "placeable-off-grid", "not-on-map", "hide-alt-info"}
   combinator.icon = entity.icon
+  combinator.icons = entity.icons
   combinator.icon_size = entity.icon_size
   combinator.max_health = entity.max_health
   combinator.minable = { mining_time = 0, results={} }
@@ -139,106 +246,6 @@ function add_prototypes(entity)
     table.insert(ghost_diagonal.pictures, {layers=layers})
   end
   data:extend{ghost_diagonal}
-end
-
-function get_train_layers(entity, direction)
-  local layers = {}
-  copy_wheels(entity, layers, 1, direction)
-  copy_wheels(entity, layers, -1, direction)
-  copy_layers(entity, layers, "pictures", direction)
-  if entity.type == "artillery-wagon" then
-    copy_layers(entity, layers, "cannon_barrel_pictures", direction)
-    copy_layers(entity, layers, "cannon_base_pictures", direction)
-  end
-  return layers
-end
-
-function copy_layers(entity, layers, pictures, direction)
-    if not entity[pictures] then return end
-    local sources = entity[pictures].layers or {entity[pictures]}
-    for _, source in pairs(sources) do
-      local layer = table.deepcopy(source)
-      fix_graphics(entity, layer, pictures, direction)
-      if layer.hr_version then
-        fix_graphics(entity, layer.hr_version, pictures, direction)
-      end
-      table.insert(layers, layer)
-  end
-end
-
-function copy_wheels(entity, layers, wheel_direction, direction)
-  if not entity.wheels then return end
-  local j = entity.joint_distance/2 * wheel_direction
-  local s45 = {x=0.64, y=0.67} -- Shift factor for 45 degree angle
-  local wheel_shifts = {
-    [0] = {0, j},
-    [1] = {-j * s45.x, j * s45.y},
-    [2] = {-j, 0},
-    [3] = {-j * s45.x, -j * s45.y},
-    [4] = {0, -j},
-    [5] = {j * s45.x, -j * s45.y},
-    [6] = {j, 0},
-    [7] = {j * s45.x, j * s45.y},
-  }
-  local shift = wheel_shifts[direction]
-  shift[2] = shift[2] + TRAIN_WHEEL_VERTICAL_SHIFT
-  if wheel_direction == -1 then direction = (direction + 4) % 8 end
-  local layer = table.deepcopy(entity.wheels)
-  layer.shift = shift
-  fix_graphics(entity, layer, pictures, direction)
-  if layer.hr_version then
-    layer.hr_version.shift = shift
-    fix_graphics(entity, layer.hr_version, pictures, direction)
-  end
-  table.insert(layers, layer)
-end
-
-function fix_graphics(entity, layer, pictures, direction)
-  if layer.direction_count
-  and layer.filenames
-  and layer.line_length
-  and layer.lines_per_file
-  and layer.width
-  and layer.height then
-    -- We have enough data to work with
-  else
-    return
-  end
-
-  if layer.apply_runtime_tint then
-    layer.tint = entity.color
-  end
-  local count = layer.direction_count
-  if layer.back_equals_front then
-    count = count * 2
-  end
-  local orientation = (math.floor(count * orientation_bias(direction / 8) + 0.5) % layer.direction_count)
-  local file = math.floor(orientation / (layer.line_length * layer.lines_per_file))
-  layer.filename = layer.filenames[file + 1]
-  local slot = orientation - file * layer.line_length * layer.lines_per_file
-  layer.x = layer.width * (slot % layer.line_length)
-  layer.y = layer.height * math.floor(slot / layer.line_length)
-  if pictures == "cannon_barrel_pictures" or pictures == "cannon_base_pictures" then
-    local cannon_shift = entity.cannon_base_shiftings[orientation + 1]
-    if not layer.shift then layer.shift = {0,0} end
-    layer.shift = {layer.shift[1] + cannon_shift[1], layer.shift[2] + cannon_shift[2]}
-  end
-end
-
-function orientation_bias(n)
-  -- There are more horizontal train sprites than vertical
-  -- so we need to bias our sprite picking function to match.
-  -- The graphic artists probably used a different function,
-  -- but this is accurate for the 8 directions I care about.
-  n = (n - math.floor(n)) * 4
-  local whole = math.floor(n)
-  local fraction = n - whole
-  if whole % 2 == 0 then
-    fraction = math.pow(fraction, 1.35)
-  else
-    fraction = 1 - math.pow(1 - fraction, 1.35)
-  end
-  return (whole + fraction) / 4
 end
 
 
