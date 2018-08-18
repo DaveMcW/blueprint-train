@@ -635,31 +635,25 @@ function serialize_signals(entity)
 
   if entity.type == "cargo-wagon" then
     local inventory = entity.get_inventory(defines.inventory.cargo_wagon)
+    local signal2 = {index=2, count=0, signal={name="signal-1", type="virtual"}}
+    table.insert(signals, signal2)
+    -- Write bar
+    if inventory.hasbar() then
+      signal2.count = inventory.getbar()
+    end
     -- Write wagon filters
     if inventory.is_filtered() then
       for i = 1, #inventory do
         local filter = inventory.get_filter(i)
         if filter then
-          if i == 1 then
-            signals[1].signal.name = filter
-            signals[1].signal.type = "item"
+          if i <= 2 then
+            signals[i].signal.name = filter
+            signals[i].signal.type = "item"
           else
             table.insert(signals, {index=i, count=0, signal={name=filter, type="item"}})
           end
         end
       end
-    end
-    -- Write bar
-    if inventory.hasbar() then
-      local signal2 = nil
-      for _,s in pairs(signals) do
-        if s.index == 2 then signal2 = s end
-      end
-      if not signal2 then
-        signal2 = {index=2, count=0, signal={name="signal-1", type="virtual"}}
-        table.insert(signals, signal2)
-      end
-      signal2.count = inventory.getbar()
     end
   elseif entity.type == "locomotive" then
     -- Write fuel
