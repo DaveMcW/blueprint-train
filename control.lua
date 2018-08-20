@@ -549,7 +549,9 @@ function set_auto_mode(ghost)
       return
     end
   end
-  ghost.entity.train.manual_mode = not ghost.auto
+  if ghost.entity.train.schedule then
+    ghost.entity.train.manual_mode = not ghost.auto
+  end
 end
 
 function calculate_offset(table1, table2)
