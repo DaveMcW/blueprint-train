@@ -1,4 +1,4 @@
-Adds support for trains in blueprints.
+Adds support for trains in [Factorio](https://www.factorio.com) blueprints.
 
 ## Features
 Locomotive schedule, fuel, and color.
