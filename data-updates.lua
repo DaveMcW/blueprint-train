@@ -169,7 +169,6 @@ local function add_prototypes(entity)
     combinator.sprites[direction] = {layers=layers}
     combinator.activity_led_sprites[direction] = {
       filename = "__core__/graphics/empty.png",
-      frame_count = 1,
       width = 1,
       height = 1,
     }
