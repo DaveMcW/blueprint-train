@@ -97,14 +97,14 @@ end
 function on_player_configured_blueprint(event)
   -- Finally, we can access the blueprint!
   local player = game.players[event.player_index]
-  if player.cursor_stack.valid_for_read
+  if not global.disabled[event.player_index]
+  and player.cursor_stack.valid_for_read
   and player.cursor_stack.name == "blueprint"
   and global.new_data[event.player_index] then
     add_to_blueprint(global.new_data[event.player_index], player.cursor_stack)
-
-    -- Discard old data
-    global.new_data[event.player_index] = nil
   end
+  -- Discard old data
+  global.new_data[event.player_index] = nil
 end
 
 function on_gui_opened(event)
@@ -542,6 +542,7 @@ function request_items(ghost)
 end
 
 function set_auto_mode(ghost)
+  if not ghost.entity.train.schedule then return end
   for i = 1, #global.ghosts do
     if global.ghosts[i].train_id == ghost.train_id
     and global.ghosts[i].entity ~= ghost.entity then
@@ -549,9 +550,7 @@ function set_auto_mode(ghost)
       return
     end
   end
-  if ghost.entity.train.schedule then
-    ghost.entity.train.manual_mode = not ghost.auto
-  end
+  ghost.entity.train.manual_mode = not ghost.auto
 end
 
 function calculate_offset(table1, table2)
@@ -1033,6 +1032,7 @@ script.on_event(defines.events.on_gui_click, on_gui_click)
 script.on_event(defines.events.on_put_item, on_put_item)
 script.on_event(defines.events.on_built_entity, on_built_entity)
 script.on_event(defines.events.on_robot_built_entity, on_built_entity)
+script.on_event(defines.events.script_raised_built, on_built_entity)
 script.on_event(defines.events.on_marked_for_deconstruction, on_marked_for_deconstruction)
 script.on_event(defines.events.on_player_setup_blueprint, on_player_setup_blueprint)
 script.on_event(defines.events.on_player_configured_blueprint, on_player_configured_blueprint)

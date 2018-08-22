@@ -1,6 +1,8 @@
 ---------------------------------------------------------------------------------------------------
 Version: 0.16.16
 Date: 20. 08. 2018
+  Changes:
+    - Can turn off mod button while new blueprint is open.
   Bugfixes:
     - Disable automatic mode for trains with no schedule.
 ---------------------------------------------------------------------------------------------------
