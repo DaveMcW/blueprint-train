@@ -1,4 +1,10 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.16.17
+Date: 26. 10. 2018
+  Bugfixes:
+    - Fixed empty wait condition causing corrupt blueprints.
+    - Fixed that trains disappeared if ghost entities were included in the blueprint.
+---------------------------------------------------------------------------------------------------
 Version: 0.16.16
 Date: 20. 08. 2018
   Changes:
