@@ -703,10 +703,11 @@ function serialize_signals(entity)
       local i = 4
       for _, record in pairs(schedule.records) do
         local name = record.station
-        if record.wait_conditions and name and name:len() > 0 then
+        if name and name:len() > 0 then
           -- Write wait condition size, station name length, and first byte of station name
+          local wait_conditions = record.wait_conditions or {}
+          b1, b2 = unpack_bytes(#wait_conditions, 2)
           local length = math.min(name:len(), 255)
-          b1, b2 = unpack_bytes(#record.wait_conditions, 2)
           local n = pack_signal(b1, b2, length, name:byte(1, 1))
           table.insert(signals, {index=i, count=n, signal={name="signal-1", type="virtual"}})
           i = i + 1
@@ -724,7 +725,7 @@ function serialize_signals(entity)
           end
 
           -- Write wait conditions
-          for _, wait_condition in pairs(record.wait_conditions) do
+          for _, wait_condition in pairs(wait_conditions) do
             local and_or = 0
             if wait_condition.compare_type == "and" then and_or = 1 end
             local type_id = nil
