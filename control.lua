@@ -608,8 +608,11 @@ function serialize_data(entities)
   local result = {}
   for _, entity in pairs(entities) do
     local data = {}
-    data.name = entity.name
     data.type = entity.type
+    data.name = entity.name
+    if (data.type == "entity-ghost") then
+      data.name = entity.ghost_name
+    end
     data.position = entity.position
     data.direction = entity.direction
 
