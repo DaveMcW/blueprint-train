@@ -148,8 +148,8 @@ local function add_prototypes(entity)
   width = math.max(width, 3)
   combinator.selection_box = {{-width/2, -height/2}, {width/2, height/2}}
   combinator.vertical_selection_shift = entity.vertical_selection_shift
-  combinator.drawing_box = entity.drawing_box
-  combinator.collision_box = entity.collision_box
+  combinator.drawing_box = table.deepcopy(entity.drawing_box)
+  combinator.collision_box = table.deepcopy(entity.collision_box)
   combinator.collision_mask = {"train-layer"}
   if entity.type == "locomotive" then
     -- Reserve 1000 slots to store complex train schedules
