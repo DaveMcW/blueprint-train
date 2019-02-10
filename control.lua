@@ -809,8 +809,8 @@ function unserialize_signals(ghost, signals, blueprint)
   ghost.train_id = get_train_id(pack_bytes(b2, b3, b4), blueprint)
   local direction_shift = ghost.direction - get_direction(ghost.orientation)
   ghost.orientation = ghost.orientation + direction_shift/8
-  if ghost.orientation >= 1 then ghost.orientation = orientation - 1 end
-  if ghost.orientation < 0 then ghost.orientation = orientation + 1 end
+  if ghost.orientation >= 1 then ghost.orientation = ghost.orientation - 1 end
+  if ghost.orientation < 0 then ghost.orientation = ghost.orientation + 1 end
 
   local type = game.entity_prototypes[ghost.name].type
   if type == "cargo-wagon" then
