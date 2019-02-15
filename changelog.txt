@@ -1,5 +1,10 @@
 ---------------------------------------------------------------------------------------------------
 Version: 0.16.19
+Date: 15. 02. 2019
+  Bugfixes:
+    - Now compatible with FactorioExtended Plus-Transport
+---------------------------------------------------------------------------------------------------
+Version: 0.16.19
 Date: 09. 02. 2019
   Bugfixes:
     - Fixed crash when placing rotated blueprint.

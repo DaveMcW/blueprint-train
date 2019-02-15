@@ -119,6 +119,14 @@ local function add_prototypes(entity)
     stack_size = 1,
   }
   -- Find the original item used to build the entity
+  for _,i in pairs(data.raw["item"]) do
+    if i.place_result == entity.name then
+      item.icon = i.icon
+      item.icons = i.icons
+      item.icon_size = i.icon_size
+      break
+    end
+  end
   for _,i in pairs(data.raw["item-with-entity-data"]) do
     if i.place_result == entity.name then
       item.icon = i.icon
