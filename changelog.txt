@@ -1,5 +1,5 @@
 ---------------------------------------------------------------------------------------------------
-Version: 0.16.19
+Version: 0.16.20
 Date: 15. 02. 2019
   Bugfixes:
     - Now compatible with FactorioExtended Plus-Transport
